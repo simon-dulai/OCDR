@@ -1,0 +1,996 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>OCDR — Optic Cup-to-Disc Ratio Monitor</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/alpinejs/3.13.5/cdn.min.js" defer></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=JetBrains+Mono:wght@300;400;500&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg:        #050508;
+      --surface:   #0d0d14;
+      --card:      #111120;
+      --border:    rgba(255,255,255,0.07);
+      --border-hi: rgba(255,110,60,0.35);
+      --purple:    #ff6e3c;
+      --purple-dim: rgba(255,110,60,0.18);
+      --purple-glow: rgba(255,110,60,0.07);
+      --text:      #e8e8f0;
+      --muted:     #6b6b80;
+      --danger:    #ff4f6e;
+      --success:   #3dffa0;
+      --warning:   #ff6e3c;
+    }
+
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    html { scroll-behavior: smooth; }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 13px;
+      min-height: 100vh;
+      overflow-x: hidden;
+    }
+
+
+    body::before {
+      content: '';
+      position: fixed;
+      inset: 0;
+      background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.035'/%3E%3C/svg%3E");
+      pointer-events: none;
+      z-index: 0;
+    }
+
+
+    body::after {
+      content: '';
+      position: fixed;
+      top: -30vh;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 80vw;
+      height: 60vh;
+      background: radial-gradient(ellipse, rgba(255,110,60,0.05) 0%, transparent 70%);
+      pointer-events: none;
+      z-index: 0;
+    }
+
+
+    nav {
+      position: sticky;
+      top: 0;
+      z-index: 100;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 2rem;
+      height: 56px;
+      background: rgba(5,5,8,0.85);
+      backdrop-filter: blur(20px);
+      border-bottom: 1px solid var(--border);
+    }
+
+    .nav-logo {
+      font-family: 'Syne', sans-serif;
+      font-weight: 800;
+      font-size: 1.3rem;
+      letter-spacing: 0.12em;
+      color: var(--text);
+    }
+
+    .nav-logo span {
+      color: var(--orange);
+    }
+
+    .nav-sub {
+      font-size: 10px;
+      color: var(--muted);
+      letter-spacing: 0.2em;
+      text-transform: uppercase;
+    }
+
+
+    main {
+      position: relative;
+      z-index: 1;
+      max-width: 1100px;
+      margin: 0 auto;
+      padding: 2.5rem 1.5rem 4rem;
+      display: flex;
+      flex-direction: column;
+      gap: 2rem;
+    }
+
+
+    .section-label {
+      font-family: 'Syne', sans-serif;
+      font-size: 10px;
+      font-weight: 700;
+      letter-spacing: 0.25em;
+      text-transform: uppercase;
+      color: var(--purple);
+      margin-bottom: 0.75rem;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+
+    .section-label::after {
+      content: '';
+      flex: 1;
+      height: 1px;
+      background: var(--border);
+    }
+
+
+    .card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 1.5rem;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .card::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background: linear-gradient(135deg, var(--purple-glow) 0%, transparent 50%);
+      pointer-events: none;
+    }
+
+
+    .patient-row {
+      display: flex;
+      align-items: center;
+      gap: 1rem;
+      flex-wrap: wrap;
+    }
+
+    .input-group {
+      display: flex;
+      flex-direction: column;
+      gap: 0.3rem;
+    }
+
+    .input-label {
+      font-size: 10px;
+      color: var(--muted);
+      letter-spacing: 0.15em;
+      text-transform: uppercase;
+    }
+
+    input[type="text"], input[type="number"] {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      color: var(--text);
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 13px;
+      padding: 0.55rem 0.85rem;
+      outline: none;
+      transition: border-color 0.2s;
+      width: 200px;
+    }
+
+    input[type="text"]:focus, input[type="number"]:focus {
+      border-color: var(--purple);
+      box-shadow: 0 0 0 3px var(--purple-dim);
+    }
+
+    .demo-pill {
+      font-family: 'Syne', sans-serif;
+      font-size: 9px;
+      font-weight: 700;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: var(--muted);
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 999px;
+      padding: 3px 10px;
+      text-decoration: none;
+      transition: color 0.2s, border-color 0.2s;
+      white-space: nowrap;
+    }
+
+    .demo-pill:hover {
+      color: var(--purple);
+      border-color: var(--border-hi);
+    }
+
+    .eye-toggle {
+      display: flex;
+      align-items: center;
+      gap: 0.6rem;
+      height: 36px; /* match input height */
+    }
+
+    .toggle-label {
+      font-size: 11px;
+      color: var(--purple);
+      letter-spacing: 0.1em;
+      font-weight: 400;
+      transition: font-weight 0.15s, opacity 0.15s;
+      opacity: 0.45;
+    }
+
+    .toggle-label.active {
+      font-weight: 800;
+      opacity: 1;
+    }
+
+    .toggle-track {
+      position: relative;
+      width: 44px;
+      height: 24px;
+      background: var(--purple-dim);
+      border: 1px solid var(--border-hi);
+      border-radius: 999px;
+      cursor: pointer;
+    }
+
+    .toggle-thumb {
+      position: absolute;
+      top: 3px;
+      left: 3px;
+      width: 16px;
+      height: 16px;
+      background: var(--purple);
+      border-radius: 50%;
+      transition: transform 0.3s cubic-bezier(0.34,1.56,0.64,1);
+    }
+
+    .toggle-track.right .toggle-thumb {
+      transform: translateX(20px);
+    }
+
+
+    .upload-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 1rem;
+    }
+
+    .upload-panel {
+      display: flex;
+      flex-direction: column;
+      gap: 0.6rem;
+    }
+
+    .upload-panel-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .panel-title {
+      font-family: 'Syne', sans-serif;
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 0.2em;
+      text-transform: uppercase;
+      color: var(--muted);
+    }
+
+    .year-badge {
+      font-size: 11px;
+      color: var(--purple);
+      background: var(--purple-dim);
+      border: 1px solid var(--border-hi);
+      border-radius: 4px;
+      padding: 2px 8px;
+    }
+
+    .drop-zone {
+      position: relative;
+      border: 1px dashed var(--border);
+      border-radius: 8px;
+      background: var(--surface);
+      aspect-ratio: 1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 0.5rem;
+      cursor: pointer;
+      transition: border-color 0.2s, background 0.2s;
+      overflow: hidden;
+    }
+
+    .drop-zone:hover, .drop-zone.dragging {
+      border-color: var(--purple);
+      background: var(--purple-glow);
+    }
+
+    .drop-zone input[type="file"] {
+      position: absolute;
+      inset: 0;
+      opacity: 0;
+      cursor: pointer;
+      width: 100%;
+      height: 100%;
+    }
+
+    .drop-zone-icon {
+      font-size: 2rem;
+      opacity: 0.3;
+    }
+
+    .drop-zone-text {
+      font-size: 11px;
+      color: var(--muted);
+      text-align: center;
+    }
+
+    .preview-img {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      border-radius: 7px;
+    }
+
+    .preview-overlay {
+      position: absolute;
+      inset: 0;
+      background: rgba(5,5,8,0.6);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      opacity: 0;
+      transition: opacity 0.2s;
+      border-radius: 7px;
+    }
+
+    .drop-zone:hover .preview-overlay {
+      opacity: 1;
+    }
+
+    .preview-change {
+      font-size: 11px;
+      color: var(--text);
+      letter-spacing: 0.1em;
+    }
+
+    /* year input under drop zone */
+    input.year-input {
+      width: 100%;
+      text-align: center;
+    }
+
+
+    .btn-analyse {
+      font-family: 'Syne', sans-serif;
+      font-weight: 700;
+      font-size: 12px;
+      letter-spacing: 0.2em;
+      text-transform: uppercase;
+      background: var(--purple);
+      color: #000;
+      border: none;
+      border-radius: 8px;
+      padding: 0.75rem 2rem;
+      cursor: pointer;
+      transition: opacity 0.2s, transform 0.15s;
+      width: 100%;
+      margin-top: 0.5rem;
+    }
+
+    .btn-analyse:hover:not(:disabled) {
+      opacity: 0.85;
+      transform: translateY(-1px);
+    }
+
+    .btn-analyse:disabled {
+      opacity: 0.35;
+      cursor: not-allowed;
+    }
+
+    .btn-reset {
+      font-family: 'Syne', sans-serif;
+      font-weight: 700;
+      font-size: 12px;
+      letter-spacing: 0.2em;
+      text-transform: uppercase;
+      background: transparent;
+      color: var(--muted);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 0.75rem 2rem;
+      cursor: pointer;
+      transition: color 0.2s, border-color 0.2s;
+      width: 100%;
+      margin-top: 0.5rem;
+    }
+
+    .btn-reset:hover {
+      color: var(--text);
+      border-color: var(--muted);
+    }
+
+
+    .spinner {
+      width: 20px;
+      height: 20px;
+      border: 2px solid rgba(0,0,0,0.2);
+      border-top-color: #000;
+      border-radius: 50%;
+      animation: spin 0.7s linear infinite;
+      display: inline-block;
+      vertical-align: middle;
+    }
+
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+
+    .results-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 1.5rem;
+    }
+
+    .result-panel {
+      display: flex;
+      flex-direction: column;
+      gap: 0.75rem;
+    }
+
+    .masked-img-wrap {
+      position: relative;
+      border-radius: 8px;
+      overflow: hidden;
+      aspect-ratio: 1;
+      background: var(--surface);
+      border: 1px solid var(--border);
+    }
+
+    .masked-img-wrap img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+    }
+
+    .result-tag {
+      position: absolute;
+      top: 8px;
+      left: 8px;
+      font-size: 10px;
+      letter-spacing: 0.15em;
+      text-transform: uppercase;
+      background: rgba(5,5,8,0.8);
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      padding: 3px 8px;
+      color: var(--muted);
+    }
+
+    .change-alert {
+      font-family: 'Syne', sans-serif;
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 0.15em;
+      text-transform: uppercase;
+      color: var(--purple);
+      text-shadow: 0 0 20px rgba(255,110,60,0.5);
+      text-align: center;
+      padding: 0.4rem;
+      border: 1px solid var(--border-hi);
+      border-radius: 6px;
+      background: var(--purple-dim);
+      animation: pulse-border 2s ease-in-out infinite;
+    }
+
+    @keyframes pulse-border {
+      0%, 100% { box-shadow: 0 0 0 0 var(--purple-dim); }
+      50%       { box-shadow: 0 0 12px 2px var(--purple-dim); }
+    }
+
+
+    .metrics {
+      display: flex;
+      flex-direction: column;
+      gap: 0.4rem;
+    }
+
+    .metric-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 0.4rem 0.6rem;
+      border-radius: 5px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+    }
+
+    .metric-key {
+      font-size: 11px;
+      color: var(--muted);
+      letter-spacing: 0.1em;
+    }
+
+    .metric-val {
+      font-size: 13px;
+      font-weight: 500;
+      color: var(--text);
+    }
+
+    .metric-val.danger {
+      color: var(--danger);
+    }
+
+    .metric-val.warning {
+      color: var(--warning);
+    }
+
+    .metric-val.good {
+      color: var(--success);
+    }
+
+
+    .chart-wrap {
+      border-radius: 8px;
+      overflow: hidden;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 240px;
+    }
+
+    .chart-wrap img {
+      width: 100%;
+      height: auto;
+      display: block;
+    }
+
+    .chart-placeholder {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 0.5rem;
+      color: var(--muted);
+      font-size: 11px;
+    }
+
+    .chart-placeholder-icon {
+      font-size: 2rem;
+      opacity: 0.3;
+    }
+
+
+    .error-bar {
+      background: rgba(255,79,110,0.12);
+      border: 1px solid rgba(255,79,110,0.35);
+      border-radius: 8px;
+      padding: 0.75rem 1rem;
+      font-size: 12px;
+      color: var(--danger);
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+
+
+    .divider {
+      height: 1px;
+      background: var(--border);
+    }
+
+
+    [x-cloak] { display: none !important; }
+
+    .fade-in {
+      animation: fadeIn 0.4s ease forwards;
+    }
+
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(6px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+
+
+    @media (max-width: 640px) {
+      .upload-grid, .results-grid { grid-template-columns: 1fr; }
+      .patient-row { flex-direction: column; align-items: flex-start; }
+    }
+  </style>
+</head>
+<body x-data="ocdr()" x-init="init()">
+
+
+  <nav>
+    <div>
+      <div class="nav-logo">OC<span>DR</span></div>
+    </div>
+  </nav>
+
+  <main>
+
+
+    <div>
+      <div class="section-label">ONH IMAGE UPLOAD</div>
+      <div class="card">
+
+
+        <div class="patient-row" style="margin-bottom:1.25rem">
+          <div class="input-group">
+            <span class="input-label">Patient ID No.</span>
+            <input type="number" x-model="patientId" placeholder="e.g. 142" min="1" />
+          </div>
+          <div class="input-group">
+            <span class="input-label">Eye</span>
+            <div class="eye-toggle">
+              <span class="toggle-label" :class="{ active: eye === 'left' }">LE</span>
+              <div class="toggle-track" :class="{ right: eye === 'right' }" @click="toggleEye()">
+                <div class="toggle-thumb"></div>
+              </div>
+              <span class="toggle-label" :class="{ active: eye === 'right' }">RE</span>
+            </div>
+          </div>
+        </div>
+
+
+        <div class="upload-grid">
+
+
+          <div class="upload-panel">
+            <div class="upload-panel-header">
+              <span class="panel-title">PREVIOUS IMAGE</span>
+              <div style="display:flex;align-items:center;gap:0.5rem">
+                <a href="/demo_images/PREVIOUS.png" download class="demo-pill" title="Download previous demo image">prev demo</a>
+                <span class="year-badge" x-text="year1 || 'Year'"></span>
+              </div>
+            </div>
+            <div class="drop-zone"
+                 :class="{ dragging: dragging1 }"
+                 @dragover.prevent="dragging1=true"
+                 @dragleave="dragging1=false"
+                 @drop.prevent="onDrop($event, 1); dragging1=false">
+              <input type="file" accept="image/jpeg,image/png" @click="$event.target.value=''" @change="onFile($event, 1)" />
+              <template x-if="!preview1">
+                <div style="display:flex;flex-direction:column;align-items:center;gap:0.4rem;pointer-events:none">
+                  <div class="drop-zone-icon">⊕</div>
+                  <div class="drop-zone-text">Drop fundus image<br/>or click to browse</div>
+                </div>
+              </template>
+              <template x-if="preview1">
+                <div style="position:absolute;inset:0">
+                  <img :src="preview1" class="preview-img" />
+                  <div class="preview-overlay"><span class="preview-change">Change image</span></div>
+                </div>
+              </template>
+            </div>
+            <div class="input-group">
+              <span class="input-label">Year</span>
+              <input type="number" x-model="year1" placeholder="e.g. 2022" class="year-input" min="1900" max="2099" />
+            </div>
+          </div>
+
+
+          <div class="upload-panel">
+            <div class="upload-panel-header">
+              <span class="panel-title">CURRENT/POST IMAGE</span>
+              <div style="display:flex;align-items:center;gap:0.5rem">
+                <a href="/demo_images/POST.png" download class="demo-pill" title="Download post demo image">post demo</a>
+                <span class="year-badge" x-text="year2 || 'Year'"></span>
+              </div>
+            </div>
+            <div class="drop-zone"
+                 :class="{ dragging: dragging2 }"
+                 @dragover.prevent="dragging2=true"
+                 @dragleave="dragging2=false"
+                 @drop.prevent="onDrop($event, 2); dragging2=false">
+              <input type="file" accept="image/jpeg,image/png" @click="$event.target.value=''" @change="onFile($event, 2)" />
+              <template x-if="!preview2">
+                <div style="display:flex;flex-direction:column;align-items:center;gap:0.4rem;pointer-events:none">
+                  <div class="drop-zone-icon">⊕</div>
+                  <div class="drop-zone-text">Drop fundus image<br/>or click to browse</div>
+                </div>
+              </template>
+              <template x-if="preview2">
+                <div style="position:absolute;inset:0">
+                  <img :src="preview2" class="preview-img" />
+                  <div class="preview-overlay"><span class="preview-change">Change image</span></div>
+                </div>
+              </template>
+            </div>
+            <div class="input-group">
+              <span class="input-label">Year</span>
+              <input type="number" x-model="year2" placeholder="e.g. 2025" class="year-input" min="1900" max="2099" />
+            </div>
+          </div>
+        </div>
+
+
+        <div x-show="error" x-cloak class="error-bar" style="margin-top:1rem">
+          <span>⚠</span>
+          <span x-text="error"></span>
+        </div>
+
+
+        <button class="btn-analyse"
+                :disabled="loading || !canSubmit"
+                @click="analyse()">
+          <template x-if="loading">
+            <span><span class="spinner"></span>&nbsp; Analysing...</span>
+          </template>
+          <template x-if="!loading">
+            <span>Run Analysis</span>
+          </template>
+        </button>
+        <button class="btn-reset"
+                x-show="results.img1 || results.img2 || preview1 || preview2"
+                x-cloak
+                @click="reset()">
+          Reset
+        </button>
+      </div>
+    </div>
+
+
+    <div x-show="results.img1 || results.img2" x-cloak class="fade-in">
+      <div class="section-label">Segmentation Results</div>
+      <div class="card">
+        <div class="results-grid">
+
+
+          <div class="result-panel">
+            <div class="masked-img-wrap">
+              <img :src="results.img1.maskedUrl" alt="Segmented disc — earlier" x-show="results.img1" />
+              <div class="result-tag" x-text="results.img1 ? (results.img1.year + ' · Earlier') : ''"></div>
+            </div>
+            <div class="metrics" x-show="results.img1">
+              <div class="metric-row">
+                <span class="metric-key">C/D Ratio</span>
+                <span class="metric-val" :class="cdClass(results.img1?.cd_ratio)" x-text="results.img1?.cd_ratio?.toFixed(4)"></span>
+              </div>
+              <div class="metric-row">
+                <span class="metric-key">Disc Area</span>
+                <span class="metric-val" x-text="results.img1?.disc_area?.toFixed(0) + ' px²'"></span>
+              </div>
+              <div class="metric-row">
+                <span class="metric-key">Cup Area</span>
+                <span class="metric-val" x-text="results.img1?.cup_area?.toFixed(0) + ' px²'"></span>
+              </div>
+            </div>
+          </div>
+
+
+          <div class="result-panel">
+            <div class="masked-img-wrap">
+              <img :src="results.img2.maskedUrl" alt="Segmented disc — recent" x-show="results.img2" />
+              <div class="result-tag" x-text="results.img2 ? (results.img2.year + ' · Recent') : ''"></div>
+            </div>
+
+            <div class="change-alert" x-show="results.changeDetected" x-cloak>
+              ⚠ Significant C/D Change Detected
+            </div>
+            <div class="metrics" x-show="results.img2">
+              <div class="metric-row">
+                <span class="metric-key">C/D Ratio</span>
+                <span class="metric-val" :class="cdClass(results.img2?.cd_ratio)" x-text="results.img2?.cd_ratio?.toFixed(4)"></span>
+              </div>
+              <div class="metric-row">
+                <span class="metric-key">Disc Area</span>
+                <span class="metric-val" x-text="results.img2?.disc_area?.toFixed(0) + ' px²'"></span>
+              </div>
+              <div class="metric-row">
+                <span class="metric-key">Cup Area</span>
+                <span class="metric-val" x-text="results.img2?.cup_area?.toFixed(0) + ' px²'"></span>
+              </div>
+              <div class="metric-row" x-show="results.delta !== null">
+                <span class="metric-key">Δ C/D Change</span>
+                <span class="metric-val"
+                      :class="results.delta > 0.05 ? 'warning' : 'good'"
+                      x-text="(results.delta >= 0 ? '+' : '') + results.delta?.toFixed(4)">
+                </span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+
+    <div x-show="trendChart" x-cloak class="fade-in">
+      <div class="section-label">C/D Ratio Trend — <span x-text="eye === 'right' ? 'Right Eye' : 'Left Eye'"></span></div>
+      <div class="card">
+        <div class="chart-wrap">
+          <img :src="'data:image/png;base64,' + trendChart" alt="C/D Ratio trend chart" />
+        </div>
+        <div style="margin-top:0.75rem; display:flex; gap:1rem; flex-wrap:wrap">
+          <div class="metric-row" style="flex:1">
+            <span class="metric-key">Records for <span x-text="patientId"></span></span>
+            <span class="metric-val" x-text="trendCount + ' measurements'"></span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+
+    <div x-show="results.img2 && !trendChart" x-cloak>
+      <div class="section-label">C/D Ratio Trend</div>
+      <div class="card">
+        <div class="chart-wrap">
+          <div class="chart-placeholder">
+            <div class="chart-placeholder-icon">◌</div>
+            <span>Need at least 2 records to plot trend</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </main>
+
+  <script>
+    function ocdr() {
+      return {
+        // State
+        eye:       'right',
+        patientId: '',
+        year1:     '',
+        year2:     '',
+        file1:     null,
+        file2:     null,
+        preview1:  null,
+        preview2:  null,
+        dragging1: false,
+        dragging2: false,
+        loading:   false,
+        error:     null,
+        results: {
+          img1:           null,
+          img2:           null,
+          changeDetected: false,
+          delta:          null,
+        },
+        trendChart:  null,
+        trendCount:  0,
+
+        init() {
+          // Watch eye toggle — reload trend when switched
+          this.$watch('eye', () => {
+            if (this.patientId && (this.results.img1 || this.results.img2)) {
+              this.fetchTrend();
+            }
+          });
+        },
+
+        get canSubmit() {
+          return this.patientId.trim() &&
+                 this.file1 && this.year1 &&
+                 this.file2 && this.year2;
+        },
+
+        toggleEye() {
+          this.eye = this.eye === 'right' ? 'left' : 'right';
+        },
+
+        onFile(event, slot) {
+          const f = event.target.files[0];
+          if (!f) return;
+          this.setFile(f, slot);
+        },
+
+        onDrop(event, slot) {
+          const f = event.dataTransfer.files[0];
+          if (!f) return;
+          this.setFile(f, slot);
+        },
+
+        setFile(f, slot) {
+          const reader = new FileReader();
+          reader.onload = e => {
+            if (slot === 1) {
+              this.file1 = f;
+              this.preview1 = e.target.result;
+            } else {
+              this.file2 = f;
+              this.preview2 = e.target.result;
+            }
+          };
+          reader.readAsDataURL(f);
+        },
+
+        async postMeasure(file, year) {
+          const fd = new FormData();
+          fd.append('image', file);
+          fd.append('patient_id', this.patientId.trim());
+          fd.append('year', year);
+          fd.append('eye', this.eye);
+
+          const res = await fetch('/measure', { method: 'POST', body: fd });
+          if (!res.ok) {
+            const err = await res.json();
+            throw new Error(err.error || 'Server error');
+          }
+          return res.json();
+        },
+
+        async fetchTrend() {
+          if (!this.patientId) return;
+          try {
+            const res = await fetch(`/patients/${encodeURIComponent(this.patientId)}/trend?eye=${this.eye}`);
+            if (!res.ok) { this.trendChart = null; return; }
+            const data = await res.json();
+            this.trendChart = data.chart || null;
+            // Count records
+            const recs = await fetch(`/patients/${encodeURIComponent(this.patientId)}?eye=${this.eye}`);
+            if (recs.ok) {
+              const list = await recs.json();
+              this.trendCount = list.length;
+            }
+          } catch {
+            this.trendChart = null;
+          }
+        },
+
+        async analyse() {
+          this.error   = null;
+          this.loading = true;
+          this.results = { img1: null, img2: null, changeDetected: false, delta: null };
+          this.trendChart = null;
+
+          try {
+            // Determine which is earlier/later by year
+            let [fileA, yearA, fileB, yearB, previewA, previewB] =
+              parseInt(this.year1) <= parseInt(this.year2)
+                ? [this.file1, this.year1, this.file2, this.year2, this.preview1, this.preview2]
+                : [this.file2, this.year2, this.file1, this.year1, this.preview2, this.preview1];
+
+            // POST both images concurrently
+            const [res1, res2] = await Promise.all([
+              this.postMeasure(fileA, yearA),
+              this.postMeasure(fileB, yearB),
+            ]);
+
+            // Use mask_b64 from POST response directly — fall back to original preview
+            const maskedUrl1 = res1.mask_b64 ? `data:image/png;base64,${res1.mask_b64}` : previewA;
+            const maskedUrl2 = res2.mask_b64 ? `data:image/png;base64,${res2.mask_b64}` : previewB;
+
+            this.results.img1 = { ...res1, maskedUrl: maskedUrl1, year: yearA };
+            this.results.img2 = { ...res2, maskedUrl: maskedUrl2, year: yearB };
+
+            const delta = res2.cd_ratio - res1.cd_ratio;
+            this.results.delta = delta;
+            this.results.changeDetected = delta >= 0.05;
+
+            await this.fetchTrend();
+          } catch (e) {
+            this.error = e.message;
+          } finally {
+            this.loading = false;
+          }
+        },
+
+        reset() {
+          this.file1    = null; this.file2    = null;
+          this.preview1 = null; this.preview2 = null;
+          this.year1    = '';   this.year2    = '';
+          this.error    = null;
+          this.results  = { img1: null, img2: null, changeDetected: false, delta: null };
+          this.trendChart = null;
+          this.trendCount = 0;
+        },
+
+        cdClass(val) {
+          if (!val && val !== 0) return '';
+          if (val >= 0.7)  return 'danger';
+          if (val >= 0.6)  return 'warning';
+          return 'good';
+        },
+      };
+    }
+  </script>
+</body>
+</html>

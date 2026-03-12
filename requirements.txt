@@ -1,0 +1,10 @@
+flask
+flask-sqlalchemy
+opencv-python
+numpy
+matplotlib
+tensorflow
+keras
+gunicorn
+psycopg2-binary
+python-dotenv
